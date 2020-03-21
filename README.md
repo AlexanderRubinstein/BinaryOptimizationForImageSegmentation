@@ -1,0 +1,2 @@
+# BinaryOptimizationForImageSegmentation
+Image Segmentation via Binary Optimization
