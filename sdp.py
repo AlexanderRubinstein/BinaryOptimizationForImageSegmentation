@@ -2,7 +2,7 @@ import numpy as np
 from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
 
 
-def SDP_relaxation(L, options={'maxiter': 100, 'disp': False}):
+def SDP_relaxation(L, options={'maxiter': 100, 'disp': False}, x0=None, full_output=False):
     """ Binary optimization with SDP relaxation."""
     def objective(L):
         def fun(x):
@@ -21,11 +21,14 @@ def SDP_relaxation(L, options={'maxiter': 100, 'disp': False}):
     
     n = L.shape[0]
     fun = objective(L)
-    x0 = np.random.choice([-1, 1], (1, n)).ravel()
+    if x0 is None:
+    	x0 = np.random.choice([-1, 1], (1, n)).ravel()
     res = minimize(fun, x0, method='SLSQP',
                    constraints=[NonlinearConstraint(constraint,
                                                     np.ones((n,)),
                                                     np.ones((n,)))],
                    options=options)
-    
-    return res.x
+    if full_output:
+    	return res
+    else:
+    	return res.x
