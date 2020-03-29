@@ -1,9 +1,9 @@
 import numpy as np
-from scipy.optimize import minimize, LinearConstraint, NonlinearConstraint
+from scipy.optimize import minimize, Bounds, NonlinearConstraint
 
 
-def SDP_relaxation(L, options={'maxiter': 100, 'disp': False}, x0=None, full_output=False):
-    """ Binary optimization with SDP relaxation."""
+def SDP_relaxation(L, l, u, options={'maxiter': 100, 'disp': False}):
+    """Binary optimization with SDP relaxation."""
     def objective(L):
         def fun(x):
             X = np.dot(x.reshape(-1, 1),
@@ -11,24 +11,30 @@ def SDP_relaxation(L, options={'maxiter': 100, 'disp': False}, x0=None, full_out
             return np.trace(np.dot(L.T, X))
         return fun
     
-    def constraint(x):
-        diag = []
-        diag.append(x[0])
-        for i in range(1, len(x) - 1):
-            diag.append(x[i]**2)
-        diag.append(-x[-1])
-        return diag
+    def trace_constraint(x):
+        return np.diag(np.dot(x.reshape(-1, 1), x.reshape(1, -1))) - np.ones((n,))
     
     n = L.shape[0]
     fun = objective(L)
-    if x0 is None:
-    	x0 = np.random.choice([-1, 1], (1, n)).ravel()
-    res = minimize(fun, x0, method='SLSQP',
-                   constraints=[NonlinearConstraint(constraint,
-                                                    np.ones((n,)),
-                                                    np.ones((n,)))],
-                   options=options)
-    if full_output:
-    	return res
-    else:
-    	return res.x
+    
+    x_best = np.zeros((n,))
+    f_min = np.inf
+    for i in range(options['maxiter']):
+        x = np.random.choice([-1, 1], (1, n)).ravel()
+        res = minimize(fun, x, method='SLSQP',
+                       bounds=[(l_i, u_i) for l_i, u_i in zip(l, u)],
+                       constraints=[{'type': 'eq', 'fun': trace_constraint}],
+                       options={'maxiter': 10})
+        
+        x = res.x
+        f_cur = np.dot(np.dot(x.reshape(1, -1), L), x.reshape(-1, 1))[0][0]
+        if f_cur < f_min:
+            f_min = f_cur
+            x_best = x
+    
+    x = x_best
+    f = np.dot(np.dot(x.reshape(1, -1), L), x.reshape(-1, 1))[0][0]
+    if options['disp']:
+        print('Function value: {}\n'.format(f)+
+              'Iterations number: {}'.format(i))
+    return x, f
