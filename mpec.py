@@ -172,3 +172,81 @@ def MPEC_EPM(L, l, u, a=None, b=None, rho=0.01, sigma=np.sqrt(10), T=10, options
         print('Function value: {}\n'.format(f)+
               'Iterations number: {}'.format(t))
     return x, f
+
+def break_point_search(d, a, s):
+    """A polynomially bounded algorithm for a singly constrained quadratic program."""
+    n = len(d)
+
+    y = np.sort(np.hstack((-a.flatten() - d.flatten()*np.ones((n,)), -a.flatten())))
+    l = 1
+    r = 2*n
+    L = n
+    R = 0
+    while 1:
+        if (r - l == 1):
+            S = (s - L) / (R - L)
+            rho = y[l-1] + (y[r-1] - y[l-1]) * S
+            break
+        else:
+            m = int(0.5 * (l + r))
+            t = (-a.flatten() - y[m-1]*np.ones((n,)))/d.flatten()
+            C = np.sum(np.array([max(0, min(t_i, 1)) for t_i in t]))
+            if (C == s):
+                rho = y[m-1]
+                break
+            elif (C > s):
+                l = m
+                L = C
+            else:
+                r = m
+                R = C
+    t = (-a.flatten() - rho)/d.flatten()
+    x = np.array([max(0, min(t_i, 1)) for t_i in t])
+    
+    return x
+
+def original_MPEC_EPM(L, k, rho=0.01, sigma=np.sqrt(10), T=10, options={'maxiter': 100, 'disp': False}):
+    """Original realization of MPEC-EPM algorithm by authors Yuan, Ganzhao & Ghanem, Bernard of the paper
+       "Binary Optimization via Mathematical Programming with Equilibrium Constraints", 2016.
+    """
+    n = L.shape[0]
+    M = np.max(np.linalg.eigvals(L))
+    
+    x = np.zeros((n,))
+    v = np.zeros((n,))
+    
+    x_best = x
+    f_min = np.inf
+    for t in range(1, options['maxiter'] + 1):
+        for i in range(50):
+            grad = np.dot(L, x) - rho*2*(2*v - 1)
+            xt = x
+            x = break_point_search(np.ones((n, 1)), -(x - grad/M), k)
+            if (i > 5) and (np.linalg.norm(x - xt)/np.linalg.norm(x) < 1e-5):
+                break
+                
+        v = (np.sqrt(n)*(2*x - 1)/np.linalg.norm(2*x - 1) + 1)/2
+
+        f_cur = np.dot(np.dot(x.reshape(1, -1), L), x.reshape(-1, 1))[0][0]
+        if f_cur < f_min:
+            f_min = f_cur
+            x_best = x
+
+        if t % T == 0:
+            rho *= sigma
+        
+        error = n - np.dot((2*x - 1).reshape(1, -1), (2*v - 1).reshape(-1, 1))
+        if (t > 10 and error < 1e-2):
+            break
+
+    def original_proj(a, k):
+        x = np.zeros((len(a), 1))
+        x[np.argsort(abs(a))[::-1][:k]] = 1
+        return x
+    
+    x = original_proj(x_best, k)
+    f = np.dot(np.dot(x.reshape(1, -1), L), x.reshape(-1, 1))[0][0]
+    if options['disp']:
+        print('Function value: {}\n'.format(f)+
+              'Iterations number: {}'.format(t))
+    return x, f
