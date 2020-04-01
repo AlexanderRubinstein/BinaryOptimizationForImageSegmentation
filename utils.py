@@ -44,6 +44,40 @@ def find_bounds(segments):
     
     return bounds
 
+def find_adjacency(segments):
+    """Finding neighbors for each superpixel."""
+    adjacency = {}
+    def add_node(d, key, value):
+        if d.get(key) == None:
+            d[key] = set()
+        d[key].add(value)
+    
+    for x in range(1, segments.shape[0] - 1):
+        for y in range(1, segments.shape[1] - 1):
+            current = segments[x, y]
+
+            left = segments[x - 1, y]
+            right = segments[x + 1, y]
+            up = segments[x, y + 1]
+            down = segments[x, y - 1]
+
+            if left != current:
+                add_node(adjacency, current, left)
+            if right != current:
+                add_node(adjacency, current, right)
+            if up != current:
+                add_node(adjacency, current, up)
+            if down != current:
+                add_node(adjacency, current, down)
+    
+    n = len(np.unique(segments))
+    adjacency_matrix = np.zeros((n, n))
+    for key in adjacency.keys():
+        for value in adjacency[key]:
+            adjacency_matrix[key, value] = 1
+        
+    return adjacency_matrix
+
 def superpixels_vectors(image, segments):
     """Сonstructing a matrix composed of
        5-dimensional pixel vectors [r, g, b, x ,y].
@@ -66,7 +100,8 @@ def superpixels_vectors(image, segments):
     
 def dist(x, y):
     """Distance function."""
-    return np.linalg.norm(x - y)
+    G = np.eye(5)
+    return np.dot(np.dot((x - y).reshape(1, -1), G), (x - y).reshape(-1, 1))
 
 def unnormalized_Laplacian(W):
     """Unnormalized Laplacian matrix сonstruction
@@ -79,13 +114,13 @@ def Laplacian(image, segments, normalization='unnormalized'):
     X = superpixels_vectors(image, segments)
     
     n = X.shape[0]
-    W = np.zeros((n, n))
+    W = find_adjacency(segments)
     for i in range(0, n):
         for j in range(n):
             if j < i:
                 W[i, j] = W[j, i]
-            elif j > i:
-                W[i, j] = dist(X[i, :], X[j, :])
+            elif (j > i) and (W[i, j] == 1):
+                W[i, j] = 1/dist(X[i, :], X[j, :])
     
     if normalization == 'unnormalized':
         L = unnormalized_Laplacian(W)
