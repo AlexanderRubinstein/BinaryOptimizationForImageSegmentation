@@ -104,14 +104,21 @@ def P(z, L, rho, v, l, u, a, b, M):
         return calculate_mid(c, l, u, np.zeros((L.shape[0], )), 0, M)
     return projection_step(c, l, u, a, b, M, lambd=0, delta_lambd=2)
 
-def accelerated_proximal_gradient_algorithm(L, rho, v, l, u, a, b, M, options={'maxiter': 1000}):
+def accelerated_proximal_gradient_algorithm(L, rho, v, l, u, a, b, M, options={'maxiter': 100}):
     """An accelerated proximal gradient algorithm
        for singly linearly constrained quadratic programs
        with box constraints.
     """
     x = np.zeros((L.shape[0], ))
+    z = np.zeros((L.shape[0], ))
+    t = 1
     for i in range(options['maxiter']):
-        x = P(x, L, rho, v, l, u, a, b, M)
+        x_next = P(z, L, rho, v, l, u, a, b, M)
+        t_next = 0.5*(1 + np.sqrt(1 + 4*t**2))
+        z = x_next + (x_next - x)*(t - 1)/t_next
+        
+        x = x_next
+        t = t_next
 
     return x
 
@@ -138,7 +145,7 @@ def MPEC_EPM(L, l, u, a=None, b=None, rho=0.01, sigma=np.sqrt(10), T=10, options
         # x-Subproblem: Accelerated Proximal Gradient Algorithm
         #               for Singly Linearly Constrained Quadratic Programs
         #               with Box Constraints
-        x = accelerated_proximal_gradient_algorithm(L, rho, v, l, u, a, b, eigval_max)
+        x = accelerated_proximal_gradient_algorithm(L, rho, v, l, u, a, b, M)
         
         # v-Subproblem:
         if np.linalg.norm(x) != 0:
