@@ -98,10 +98,24 @@ def superpixels_vectors(image, segments):
         
     return X
     
-def dist(x, y):
+def dist(x, y, mode='linear'):
     """Distance function."""
-    G = np.eye(5)
-    return np.dot(np.dot((x - y).reshape(1, -1), G), (x - y).reshape(-1, 1))
+    if mode == 'linear':
+        G = np.eye(5)
+        d = np.dot(np.dot((x - y).reshape(1, -1), G), (x - y).reshape(-1, 1))
+    elif mode == 'exponential':
+        sigma_r = 1
+        sigma_w = 1
+        r = np.linalg.norm(x[3:]-y[3:])**2
+        w = np.linalg.norm(x[:3]-y[:3])**2
+        d = np.exp(-r/sigma_r)*np.exp(-w/sigma_w)
+    elif mode == 'manhattan':
+        d = np.linalg.norm(x - y, ord=1)
+    else:
+        raise ValueError('Wrong mode:', mode)
+
+    
+    return d
 
 def unnormalized_Laplacian(W):
     """Unnormalized Laplacian matrix сonstruction
@@ -109,7 +123,7 @@ def unnormalized_Laplacian(W):
     """
     return np.diag(np.sum(W, axis=1)) - W
 
-def Laplacian(image, segments, normalization='unnormalized'):
+def Laplacian(image, segments, normalization='unnormalized', mode='linear'):
     """Laplacian matrix for graph based on image superpixels."""
     X = superpixels_vectors(image, segments)
     
@@ -120,7 +134,7 @@ def Laplacian(image, segments, normalization='unnormalized'):
             if j < i:
                 W[i, j] = W[j, i]
             elif (j > i) and (W[i, j] == 1):
-                W[i, j] = 1/dist(X[i, :], X[j, :])
+                W[i, j] = 1/dist(X[i, :], X[j, :], mode=mode)
     
     if normalization == 'unnormalized':
         L = unnormalized_Laplacian(W)
